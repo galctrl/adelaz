@@ -5,7 +5,18 @@ import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Product } from '@/types';
 
-// Copy all interfaces from admin/order/[id]/page.tsx
+// Update the interfaces at the top of the file
+interface StoreResponse {
+  name: string;
+}
+
+interface OrderResponse {
+  id: number;
+  store_id: number;
+  status: string;
+  store: StoreResponse;
+}
+
 interface OrderItem {
   product_id: number;
   quantity: number;
@@ -16,9 +27,7 @@ interface OrderDetails {
   id: number;
   store_id: number;
   status: string;
-  store: {
-    name: string;
-  };
+  store: StoreResponse;
   items: OrderItem[];
 }
 
@@ -49,7 +58,7 @@ export default function MahsanOrderPage() {
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('ירקות');
   const [categories, setCategories] = useState<string[]>([]);
-  const [fulfilledQuantities, setFulfilledQuantities] = useState<{[key: number]: number}>({});
+  const [fulfilledQuantities, setFulfilledQuantities] = useState<{[key: string]: number}>({});
   const router = useRouter();
   const params = useParams();
   const orderId = params?.id as string;
@@ -74,7 +83,7 @@ export default function MahsanOrderPage() {
         id,
         store_id,
         status,
-        store:stores(name)
+        store:stores!inner(name)
       `)
       .eq('id', orderId)
       .single();
@@ -86,11 +95,22 @@ export default function MahsanOrderPage() {
         .eq('order_id', orderId);
 
       if (itemsData) {
-        setOrderDetails({ ...orderData, items: itemsData });
+        // Add type assertion to handle the store data structure
+        const storeData = orderData.store as unknown as { name: string };
+        
+        const transformedOrderData: OrderDetails = {
+          ...orderData,
+          store: { name: storeData.name },
+          items: itemsData
+        };
+        
+        setOrderDetails(transformedOrderData);
+        
         const initialFulfilled = itemsData.reduce((acc, item) => ({
           ...acc,
-          [item.product_id]: item.fulfilled_quantity || item.quantity
-        }), {});
+          [item.product_id.toString()]: item.fulfilled_quantity || item.quantity
+        }), {} as {[key: string]: number});
+        
         setFulfilledQuantities(initialFulfilled);
       }
     }
@@ -109,10 +129,10 @@ export default function MahsanOrderPage() {
     }
   };
 
-  const handleFulfilledChange = (productId: number, quantity: number) => {
+  const handleFulfilledChange = (productId: string | number, quantity: number) => {
     setFulfilledQuantities(prev => ({
       ...prev,
-      [productId]: quantity
+      [productId.toString()]: quantity
     }));
   };
 
@@ -126,7 +146,7 @@ export default function MahsanOrderPage() {
           .from('order_items')
           .update({ fulfilled_quantity: quantity })
           .eq('order_id', orderDetails.id)
-          .eq('product_id', productId)
+          .eq('product_id', parseInt(productId))
       );
 
       await Promise.all(updatePromises);
@@ -167,11 +187,12 @@ export default function MahsanOrderPage() {
             const orderItem = orderDetails?.items.find(item => item.product_id === product.id);
             if (!orderItem) return null;
 
-            const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[product.id];
+            const productId = product.id.toString();
+            const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[productId];
 
             return (
               <div 
-                key={product.id} 
+                key={productId} 
                 className={`flex items-center justify-between p-4 rounded-lg border-2 border-[#FFB200] ${
                   isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
                 }`}
@@ -182,7 +203,7 @@ export default function MahsanOrderPage() {
                 </div>
                 <div className="flex items-center space-x-4 gap-2 text-[#640D5F]">
                   <span>הוזמן:{orderItem.quantity}</span>
-                  <span>סופק:{fulfilledQuantities[product.id] || 0}</span>
+                  <span>סופק:{fulfilledQuantities[productId] || 0}</span>
                 </div>
               </div>
             );
@@ -205,11 +226,12 @@ export default function MahsanOrderPage() {
           const orderItem = orderDetails?.items.find(item => item.product_id === product.id);
           if (!orderItem) return null;
 
-          const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[product.id];
+          const productId = product.id.toString();
+          const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[productId];
 
           return (
             <div 
-              key={product.id} 
+              key={productId} 
               className={`flex items-center justify-between p-4 rounded-lg border-2 border-[#FFB200] ${
                 isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
               }`}
@@ -221,8 +243,8 @@ export default function MahsanOrderPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-[#640D5F]">סופק:</span>
                     <select
-                      value={fulfilledQuantities[product.id] || 0}
-                      onChange={(e) => handleFulfilledChange(product.id, parseInt(e.target.value))}
+                      value={fulfilledQuantities[productId] || 0}
+                      onChange={(e) => handleFulfilledChange(productId, parseInt(e.target.value))}
                       className="rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F]"
                     >
                       {[...Array(orderItem.quantity + 1)].map((_, i) => (

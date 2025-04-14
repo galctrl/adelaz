@@ -4,23 +4,25 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
-interface Order {
+interface StoreResponse {
+  name: string;
+}
+
+interface OrderResponse {
   id: number;
   store_id: number;
   status: string;
   updated_at: string;
-  store: {
-    name: string;
-  };
+  store: StoreResponse;
 }
 
 type OrderTab = 'open' | 'closed' | 'in_progress';
 
 export default function MahsanPage() {
   const [activeOrderTab, setActiveOrderTab] = useState<OrderTab>('open');
-  const [openOrders, setOpenOrders] = useState<Order[]>([]);
-  const [closedOrders, setClosedOrders] = useState<Order[]>([]);
-  const [inProgressOrders, setInProgressOrders] = useState<Order[]>([]);
+  const [openOrders, setOpenOrders] = useState<OrderResponse[]>([]);
+  const [closedOrders, setClosedOrders] = useState<OrderResponse[]>([]);
+  const [inProgressOrders, setInProgressOrders] = useState<OrderResponse[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -108,7 +110,7 @@ export default function MahsanPage() {
     });
   };
 
-  const renderOrdersList = (orders: Order[], status: OrderTab) => {
+  const renderOrdersList = (orders: OrderResponse[], status: OrderTab) => {
     if (orders.length === 0) {
       const statusText = {
         open: 'פתוחות',
