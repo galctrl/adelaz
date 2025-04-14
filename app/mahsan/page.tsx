@@ -78,7 +78,12 @@ export default function MahsanPage() {
       setInProgressOrders(transformedProgressOrders);
     }
 
-    // Fetch closed orders
+    // Get date from 2 days ago
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const twoDaysAgoStr = twoDaysAgo.toISOString();
+
+    // Update closed orders fetch
     const { data: closedData, error: closedError } = await supabase
       .from('orders')
       .select(`
@@ -89,6 +94,7 @@ export default function MahsanPage() {
         store:stores!inner(name)
       `)
       .eq('status', 'closed')
+      .gte('created_at', twoDaysAgoStr)  // Add date filter
       .order('updated_at', { ascending: false });
 
     if (closedData) {

@@ -178,87 +178,75 @@ export default function MahsanOrderPage() {
   };
 
   const renderContent = () => {
-    const categoryProducts = getProductsForCategory(selectedCategory);
-
-    if (selectedCategory === 'הזמנה') {
-      return (
-        <div className="space-y-4">
-          {categoryProducts.map(product => {
-            const orderItem = orderDetails?.items.find(item => item.product_id === product.id);
-            if (!orderItem) return null;
-
-            const productId = product.id.toString();
-            const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[productId];
-
-            return (
-              <div 
-                key={productId} 
-                className={`flex items-center justify-between p-4 rounded-lg border-2 border-[#FFB200] ${
-                  isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
-                }`}
-              >
-                <div className="flex flex-col">
-                  <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
-                  <span className="text-sm text-gray-500">{product.category}</span>
-                </div>
-                <div className="flex items-center space-x-4 gap-2 text-[#640D5F]">
-                  <span>הוזמן:{orderItem.quantity}</span>
-                  <span>סופק:{fulfilledQuantities[productId] || 0}</span>
-                </div>
-              </div>
-            );
-          })}
-          {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') && (
-            <button
-              onClick={handleCloseOrder}
-              className="mt-6 w-full py-3 px-4 rounded-lg font-bold text-white bg-[#EB5B00] hover:bg-[#FFB200] transition-colors duration-200"
-            >
-              סגור הזמנה
-            </button>
-          )}
-        </div>
-      );
-    }
+    // Group products by category
+    const groupedProducts = products.reduce((acc, product) => {
+      if (product.category && orderDetails?.items.some(item => item.product_id === product.id)) {
+        if (!acc[product.category]) {
+          acc[product.category] = [];
+        }
+        acc[product.category].push(product);
+      }
+      return acc;
+    }, {} as { [key: string]: Product[] });
 
     return (
-      <div className="space-y-4">
-        {categoryProducts.map(product => {
-          const orderItem = orderDetails?.items.find(item => item.product_id === product.id);
-          if (!orderItem) return null;
+      <div className="space-y-8">
+        {Object.entries(groupedProducts).map(([category, categoryProducts]) => (
+          <div key={category} className="space-y-4">
+            <h2 className="text-xl font-bold text-[#640D5F] border-b-2 border-[#FFB200] pb-2">
+              {category}
+            </h2>
+            
+            <div className="space-y-3">
+              {categoryProducts.map(product => {
+                const orderItem = orderDetails?.items.find(item => item.product_id === product.id);
+                if (!orderItem) return null;
 
-          const productId = product.id.toString();
-          const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[productId];
+                const productId = product.id.toString();
+                const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[productId];
 
-          return (
-            <div 
-              key={productId} 
-              className={`flex items-center justify-between p-4 rounded-lg border-2 border-[#FFB200] ${
-                isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
-              }`}
-            >
-              <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
-              <div className="flex items-center gap-3">
-                <span className="text-[#640D5F]">הוזמן:{orderItem.quantity}</span>
-                {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#640D5F]">סופק:</span>
-                    <select
-                      value={fulfilledQuantities[productId] || 0}
-                      onChange={(e) => handleFulfilledChange(productId, parseInt(e.target.value))}
-                      className="rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F]"
-                    >
-                      {[...Array(orderItem.quantity + 1)].map((_, i) => (
-                        <option key={i} value={i}>{i}</option>
-                      ))}
-                    </select>
+                return (
+                  <div 
+                    key={productId} 
+                    className={`flex items-center justify-between p-4 rounded-lg border-2 border-[#FFB200] ${
+                      isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[#640D5F]">הוזמן:{orderItem.quantity}</span>
+                      {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#640D5F]">סופק:</span>
+                          <select
+                            value={fulfilledQuantities[productId] || 0}
+                            onChange={(e) => handleFulfilledChange(productId, parseInt(e.target.value))}
+                            className="rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F]"
+                          >
+                            {[...Array(orderItem.quantity + 1)].map((_, i) => (
+                              <option key={i} value={i}>{i}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <span className="text-[#640D5F]">סופק:{orderItem.fulfilled_quantity || 0}</span>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <span className="text-[#640D5F]">סופק:{orderItem.fulfilled_quantity || 0}</span>
-                )}
-              </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
+
+        {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') && (
+          <button
+            onClick={handleCloseOrder}
+            className="mt-6 w-full py-3 px-4 rounded-lg font-bold text-white bg-[#EB5B00] hover:bg-[#FFB200] transition-colors duration-200"
+          >
+            סגור הזמנה
+          </button>
+        )}
       </div>
     );
   };
@@ -270,36 +258,25 @@ export default function MahsanOrderPage() {
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-6">
         <div className="relative flex items-center justify-between mb-6">
           <button
-            onClick={() => setSelectedCategory('הזמנה')}
-            className={`absolute left-0 p-2 rounded-lg transition-colors duration-200 ${
-              selectedCategory === 'הזמנה'
-                ? 'text-[#FFB200]'
-                : 'text-[#640D5F] hover:text-[#FFB200]'
-            }`}
+            onClick={() => router.push('/mahsan')}
+            className="absolute right-0 p-2 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200"
           >
-            <CartIcon itemCount={orderDetails?.items.length || 0} />
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              strokeWidth={1.5} 
+              stroke="currentColor" 
+              className="w-6 h-6"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+            </svg>
           </button>
           <h1 className="text-2xl font-bold text-[#640D5F] text-center w-full">
             הזמנה #{orderDetails?.id} - {orderDetails?.store?.name}
           </h1>
         </div>
         
-        <div className="flex space-x-2 mb-6 border-b border-[#FFB200] overflow-x-auto">
-          {categories.map(category => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 ${
-                selectedCategory === category
-                  ? 'bg-[#FFB200] text-white'
-                  : 'text-[#640D5F] hover:bg-[#FFB200]/20'
-              }`}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-
         {renderContent()}
       </div>
     </div>
