@@ -16,13 +16,14 @@ interface Order {
 }
 
 type MainTab = 'products' | 'orders';
-type OrderTab = 'open' | 'closed';
+type OrderTab = 'open' | 'in_progress' | 'closed';
 
 export default function AdminPage() {
   const [activeMainTab, setActiveMainTab] = useState<MainTab>('products');
   const [activeOrderTab, setActiveOrderTab] = useState<OrderTab>('open');
   const [products, setProducts] = useState<Product[]>([]);
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
+  const [inProgressOrders, setInProgressOrders] = useState<Order[]>([]);
   const [closedOrders, setClosedOrders] = useState<Order[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -77,6 +78,27 @@ export default function AdminPage() {
         store: { name: (order.store as any).name }
       }));
       setOpenOrders(transformedOpenOrders);
+    }
+
+    // Add fetch for in_progress orders
+    const { data: progressData, error: progressError } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        store_id,
+        status,
+        updated_at,
+        store:stores!inner(name)
+      `)
+      .eq('status', 'in_progress')
+      .order('updated_at', { ascending: false });
+
+    if (progressData) {
+      const transformedProgressOrders = progressData.map(order => ({
+        ...order,
+        store: { name: (order.store as any).name }
+      }));
+      setInProgressOrders(transformedProgressOrders);
     }
 
     // Fetch closed orders
@@ -284,6 +306,16 @@ export default function AdminPage() {
             הזמנות פתוחות
           </button>
           <button
+            onClick={() => setActiveOrderTab('in_progress')}
+            className={`px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 whitespace-nowrap ${
+              activeOrderTab === 'in_progress'
+                ? 'bg-[#FFB200] text-white'
+                : 'text-[#640D5F] hover:bg-[#FFB200]/20'
+            }`}
+          >
+            הזמנות בהכנה
+          </button>
+          <button
             onClick={() => setActiveOrderTab('closed')}
             className={`px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 whitespace-nowrap ${
               activeOrderTab === 'closed'
@@ -298,8 +330,11 @@ export default function AdminPage() {
         {/* Orders List */}
         <div className="space-y-4">
           {renderOrdersList(
-            activeOrderTab === 'open' ? openOrders : closedOrders,
-            activeOrderTab === 'closed'
+            activeOrderTab === 'open' 
+              ? openOrders 
+              : activeOrderTab === 'in_progress'
+                ? inProgressOrders
+                : closedOrders
           )}
         </div>
       </div>

@@ -214,10 +214,10 @@ export default function MahsanOrderPage() {
                   >
                     <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
                     <div className="flex items-center gap-3">
-                      <span className="text-[#640D5F]">הוזמן:{orderItem.quantity}</span>
+                      <span className="text-[#640D5F]">הוזמן: {orderItem.quantity}</span>
                       {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-[#640D5F]">סופק:</span>
+                          <span className="text-[#640D5F]">סופק: </span>
                           <select
                             value={fulfilledQuantities[productId] || 0}
                             onChange={(e) => handleFulfilledChange(productId, parseInt(e.target.value))}
@@ -229,7 +229,7 @@ export default function MahsanOrderPage() {
                           </select>
                         </div>
                       ) : (
-                        <span className="text-[#640D5F]">סופק:{orderItem.fulfilled_quantity || 0}</span>
+                        <span className="text-[#640D5F]">סופק: {orderItem.fulfilled_quantity || 0}</span>
                       )}
                     </div>
                   </div>

@@ -6,6 +6,17 @@ import { useRouter } from 'next/navigation';
 
 const ADMIN_STORE_ID = "1"; // Admin is store ID 1
 
+const stores = [
+  { id: 1, name: 'אלי כהן' },
+  { id: 2, name: 'אלי כהן 2' },
+  { id: 3, name: 'אלי כהן 3' },
+  { id: 4, name: 'אלי כהן 4' },
+  { id: 5, name: 'אלי כהן 5' },
+  { id: 6, name: 'אלי כהן 6' },
+  { id: 7, name: 'מחסן' },
+  { id: 8, name: 'tv' }  // Add TV store
+];
+
 export default function Home() {
   const [selectedStore, setSelectedStore] = useState('');
   const [password, setPassword] = useState('');
@@ -34,8 +45,11 @@ export default function Home() {
       case ADMIN_STORE_ID:
         router.push('/admin');
         break;
-      case "7":
+      case "7":  // Warehouse
         router.push('/mahsan');
+        break;
+      case "8":  // TV
+        router.push('/tv');
         break;
       default:
         router.push('/order');
@@ -66,6 +80,7 @@ export default function Home() {
               <option value="6">פתח תקווה</option>
               <option value="1">בק אופיס</option>
               <option value="7">מחסן</option>
+              <option value="8">tv</option>
             </select>
           </div>
 

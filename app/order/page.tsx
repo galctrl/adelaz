@@ -33,6 +33,19 @@ const CartIcon = ({ itemCount }: { itemCount: number }) => (
   </div>
 );
 
+const OrdersIcon = () => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    fill="none" 
+    viewBox="0 0 24 24" 
+    strokeWidth={1.5} 
+    stroke="currentColor" 
+    className="w-6 h-6"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+  </svg>
+);
+
 export default function OrderPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<{[key: string]: number}>({});
@@ -67,7 +80,7 @@ export default function OrderPage() {
       // Found an open order, get its items
       const { data: itemsData } = await supabase
         .from('order_items')
-        .select('product_id, quantity')
+        .select('product_id, quantity, fulfilled_quantity')
         .eq('order_id', orderData.id);
 
       if (itemsData) {
@@ -103,25 +116,33 @@ export default function OrderPage() {
   const handleQuantityChange = async (productId: number | string, quantity: number) => {
     const productIdStr = productId.toString();
     const storeId = localStorage.getItem('storeId');
-    if (!storeId) return;
+    if (!storeId) {
+      router.push('/');
+      return;
+    }
 
     try {
       if (currentOrderId) {
         // Check current order status
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
-          .select('status')
+          .select('status, store_id')  // Also select store_id to verify ownership
           .eq('id', currentOrderId)
           .single();
 
         if (orderError) throw orderError;
+
+        // Verify order belongs to current store
+        if (orderData.store_id !== parseInt(storeId)) {
+          throw new Error('Order belongs to different store');
+        }
 
         if (orderData.status !== 'open') {
           // Create new order if current order is not open
           const { data: newOrderData, error: newOrderError } = await supabase
             .from('orders')
             .insert({
-              store_id: parseInt(storeId),
+              store_id: parseInt(storeId),  // Use current store ID
               status: 'open'
             })
             .select()
@@ -129,7 +150,6 @@ export default function OrderPage() {
 
           if (newOrderError) throw newOrderError;
 
-          // Set the new order as current
           setCurrentOrderId(newOrderData.id);
 
           // Insert the new quantity
@@ -253,9 +273,9 @@ export default function OrderPage() {
                   <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
                   <span className="text-sm text-gray-500">{product.category}</span>
                 </div>
-                <span className="text-lg text-[#640D5F] font-bold">
-                  כמות: {quantities[product.id.toString()]}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[#640D5F]">כמות: {quantities[product.id.toString()]}</span>
+                </div>
               </div>
             ))
           )}
@@ -287,16 +307,24 @@ export default function OrderPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#640D5F] to-[#D91656] p-4">
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-6">
         <div className="relative flex items-center justify-between mb-6">
-          <button
-            onClick={() => setSelectedCategory('הזמנה')}
-            className={`absolute left-0 p-2 rounded-lg transition-colors duration-200 ${
-              selectedCategory === 'הזמנה'
-                ? 'text-[#FFB200]'
-                : 'text-[#640D5F] hover:text-[#FFB200]'
-            }`}
-          >
-            <CartIcon itemCount={selectedProducts.length} />
-          </button>
+          <div className="absolute left-0 flex items-center gap-4">
+            <button
+              onClick={() => setSelectedCategory('הזמנה')}
+              className={`p-2 rounded-lg transition-colors duration-200 ${
+                selectedCategory === 'הזמנה'
+                  ? 'text-[#FFB200]'
+                  : 'text-[#640D5F] hover:text-[#FFB200]'
+              }`}
+            >
+              <CartIcon itemCount={selectedProducts.length} />
+            </button>
+            <button
+              onClick={() => router.push('/orders')}
+              className="p-2 rounded-lg transition-colors duration-200 text-[#640D5F] hover:text-[#FFB200]"
+            >
+              <OrdersIcon />
+            </button>
+          </div>
           <h1 className="text-2xl font-bold text-[#640D5F] text-center w-full">
             {currentOrderId ? 'עריכת הזמנה' : 'הזמנה חדשה'}
           </h1>

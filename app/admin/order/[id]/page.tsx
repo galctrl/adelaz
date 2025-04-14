@@ -198,8 +198,8 @@ export default function AdminOrderPage() {
                   <span className="text-sm text-gray-500">{product.category}</span>
                 </div>
                 <div className="flex items-center space-x-4 gap-2 text-[#640D5F]">
-                  <span>הוזמן:{orderItem.quantity}</span>
-                  <span>סופק:{fulfilledQuantities[productId] || 0}</span>
+                  <span>הוזמן: {orderItem.quantity}</span>
+                  <span>סופק: {fulfilledQuantities[productId] || 0}</span>
                 </div>
               </div>
             );
@@ -234,10 +234,10 @@ export default function AdminOrderPage() {
             >
               <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
               <div className="flex items-center gap-3">
-                <span className="text-[#640D5F]">הוזמן:{orderItem.quantity}</span>
+                <span className="text-[#640D5F]">הוזמן: {orderItem.quantity}</span>
                 {orderDetails?.status === 'open' ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-[#640D5F]">סופק:</span>
+                    <span className="text-[#640D5F]">סופק: </span>
                     <select
                       value={fulfilledQuantities[productId] || 0}
                       onChange={(e) => handleFulfilledChange(productId, parseInt(e.target.value))}
@@ -249,7 +249,7 @@ export default function AdminOrderPage() {
                     </select>
                   </div>
                 ) : (
-                  <span className="text-[#640D5F]">סופק:{orderItem.fulfilled_quantity || 0}</span>
+                  <span className="text-[#640D5F]">סופק: {orderItem.fulfilled_quantity || 0}</span>
                 )}
               </div>
             </div>
