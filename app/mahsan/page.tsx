@@ -173,10 +173,10 @@ export default function MahsanPage() {
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-6">
         <h1 className="text-2xl font-bold mb-6 text-[#640D5F] text-center">ניהול הזמנות</h1>
         
-        <div className="flex space-x-2 mb-6 border-b border-[#FFB200] overflow-x-auto">
+        <div className="flex space-x-2 mb-6 border-b border-[#FFB200] overflow-x-auto touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
           <button
             onClick={() => setActiveOrderTab('open')}
-            className={`px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 whitespace-nowrap ${
+            className={`flex-shrink-0 px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 whitespace-nowrap ${
               activeOrderTab === 'open'
                 ? 'bg-[#FFB200] text-white'
                 : 'text-[#640D5F] hover:bg-[#FFB200]/20'

@@ -302,12 +302,12 @@ export default function OrderPage() {
           </h1>
         </div>
         
-        <div className="flex space-x-2 mb-6 border-b border-[#FFB200]">
+        <div className="flex space-x-2 mb-6 border-b border-[#FFB200] overflow-x-auto touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
           {categories.map(category => (
             <button
               key={category}
               onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 ${
+              className={`flex-shrink-0 px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 ${
                 selectedCategory === category
                   ? 'bg-[#FFB200] text-white'
                   : 'text-[#640D5F] hover:bg-[#FFB200]/20'

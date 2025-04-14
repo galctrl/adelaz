@@ -208,7 +208,7 @@ export default function MahsanOrderPage() {
               </div>
             );
           })}
-          {orderDetails?.status === 'open' && (
+          {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') && (
             <button
               onClick={handleCloseOrder}
               className="mt-6 w-full py-3 px-4 rounded-lg font-bold text-white bg-[#EB5B00] hover:bg-[#FFB200] transition-colors duration-200"
@@ -239,7 +239,7 @@ export default function MahsanOrderPage() {
               <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
               <div className="flex items-center gap-3">
                 <span className="text-[#640D5F]">הוזמן:{orderItem.quantity}</span>
-                {orderDetails?.status === 'open' ? (
+                {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') ? (
                   <div className="flex items-center gap-2">
                     <span className="text-[#640D5F]">סופק:</span>
                     <select
