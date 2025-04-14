@@ -26,6 +26,8 @@ export default function AdminPage() {
   const [closedOrders, setClosedOrders] = useState<Order[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -120,6 +122,38 @@ export default function AdminPage() {
     });
   };
 
+  const handleProductNameUpdate = async (productId: string | number, newName: string) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ name: newName })
+        .eq('id', productId);
+
+      if (error) {
+        console.error('Error updating product name:', error);
+        alert('שגיאה בעדכון שם המוצר');
+        return;
+      }
+
+      // Update local state
+      setProducts(products.map(product => 
+        product.id === productId 
+          ? { ...product, name: newName }
+          : product
+      ));
+    } catch (error) {
+      console.error('Error updating product name:', error);
+      alert('שגיאה בעדכון שם המוצר');
+    } finally {
+      setEditingProductId(null);
+      setEditingName('');
+    }
+  };
+
+  const getProductsForCategory = (category: string) => {
+    return products.filter(product => product.category === category);
+  };
+
   const renderProductsContent = () => {
     const filteredProducts = selectedCategory 
       ? products.filter(product => product.category === selectedCategory)
@@ -147,21 +181,62 @@ export default function AdminPage() {
         {/* Products List */}
         <div className="space-y-4">
           {filteredProducts.map(product => (
-            <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-[#FFB200]">
-              <div className="flex flex-col">
-                <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
+            <div 
+              key={product.id}
+              className="flex items-center justify-between p-4 rounded-lg border-2 border-[#FFB200] bg-gray-50"
+            >
+              {editingProductId === product.id ? (
+                <input
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={() => {
+                    if (editingName.trim() !== '') {
+                      handleProductNameUpdate(product.id, editingName);
+                    } else {
+                      setEditingProductId(null);
+                      setEditingName('');
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && editingName.trim() !== '') {
+                      handleProductNameUpdate(product.id, editingName);
+                    } else if (e.key === 'Escape') {
+                      setEditingProductId(null);
+                      setEditingName('');
+                    }
+                  }}
+                  className="text-lg text-[#640D5F] font-medium bg-white rounded-lg border-2 border-[#FFB200] p-1"
+                  autoFocus
+                />
+              ) : (
+                <span 
+                  className="text-lg text-[#640D5F] font-medium cursor-pointer hover:text-[#FFB200]"
+                  onClick={() => {
+                    setEditingProductId(product.id);
+                    setEditingName(product.name);
+                  }}
+                >
+                  {product.name}
+                </span>
+              )}
+              
+              <div className="flex items-center gap-3">
                 <span className="text-sm text-gray-500">{product.category}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAvailabilityToggle(product);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium ${
+                    product.available
+                      ? 'bg-green-500 hover:bg-green-600'
+                      : 'bg-red-500 hover:bg-red-600'
+                  } text-white`}
+                >
+                  {product.available ? 'זמין' : 'לא זמין'}
+                </button>
               </div>
-              <button
-                onClick={() => handleAvailabilityToggle(product)}
-                className={`px-4 py-2 rounded-lg font-medium ${
-                  product.available
-                    ? 'bg-green-500 hover:bg-green-600'
-                    : 'bg-red-500 hover:bg-red-600'
-                } text-white`}
-              >
-                {product.available ? 'זמין' : 'לא זמין'}
-              </button>
             </div>
           ))}
         </div>
