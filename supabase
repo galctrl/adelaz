@@ -1,3 +1,1 @@
--- Add new store for TV
-INSERT INTO stores (id, name, password)
-VALUES (8, 'tv', 'natitv'); 
+
