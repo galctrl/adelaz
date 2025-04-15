@@ -7,6 +7,7 @@ export interface Store {
 export interface Product {
     id: string | number;
     name: string;
+    thai_product_name: string;
     category: string | null;
     price: number | null;
     available: boolean;

@@ -59,6 +59,7 @@ export default function MahsanOrderPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('ירקות');
   const [categories, setCategories] = useState<string[]>([]);
   const [fulfilledQuantities, setFulfilledQuantities] = useState<{[key: string]: number}>({});
+  const [showThaiNames, setShowThaiNames] = useState(false);
   const router = useRouter();
   const params = useParams();
   const orderId = params?.id as string;
@@ -212,7 +213,9 @@ export default function MahsanOrderPage() {
                       isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
                     }`}
                   >
-                    <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
+                    <span className="text-lg text-[#640D5F] font-medium">
+                      {showThaiNames ? product.thai_product_name : product.name}
+                    </span>
                     <div className="flex items-center gap-3">
                       <span className="text-[#640D5F]">הוזמן: {orderItem.quantity}</span>
                       {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') ? (
@@ -259,7 +262,7 @@ export default function MahsanOrderPage() {
         <div className="relative flex items-center justify-between mb-6">
           <button
             onClick={() => router.push('/mahsan')}
-            className="absolute right-0 p-2 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200"
+            className="p-2 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200"
           >
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
@@ -275,6 +278,21 @@ export default function MahsanOrderPage() {
           <h1 className="text-2xl font-bold text-[#640D5F] text-center w-full">
             הזמנה #{orderDetails?.id} - {orderDetails?.store?.name}
           </h1>
+          <button
+            onClick={() => setShowThaiNames(!showThaiNames)}
+            className="p-2 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200"
+          >
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              strokeWidth={1.5} 
+              stroke="currentColor" 
+              className="w-6 h-6"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 7.5a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" />
+            </svg>
+          </button>
         </div>
         
         {renderContent()}
