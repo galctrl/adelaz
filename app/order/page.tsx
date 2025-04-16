@@ -288,15 +288,13 @@ export default function OrderPage() {
         {filteredProducts.map(product => (
           <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-[#FFB200]">
             <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
-            <select
+            <input
+              type="number"
+              min="0"
               value={quantities[product.id.toString()] || 0}
-              onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value))}
-              className="ml-4 rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F] focus:border-[#EB5B00] focus:ring-[#EB5B00] bg-white"
-            >
-              {[...Array(11)].map((_, i) => (
-                <option key={i} value={i}>{i}</option>
-              ))}
-            </select>
+              onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value) || 0)}
+              className="ml-4 rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F] focus:border-[#EB5B00] focus:ring-[#EB5B00] bg-white w-20"
+            />
           </div>
         ))}
       </div>

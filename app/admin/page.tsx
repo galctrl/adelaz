@@ -232,19 +232,39 @@ export default function AdminPage() {
                   autoFocus
                 />
               ) : (
-                <span 
-                  className="text-lg text-[#640D5F] font-medium cursor-pointer hover:text-[#FFB200]"
-                  onClick={() => {
-                    setEditingProductId(product.id);
-                    setEditingName(product.name);
-                  }}
-                >
-                  {product.name}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => router.push(`/admin/modify/${product.id}`)}
+                    className="p-1.5 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-5 h-5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                      />
+                    </svg>
+                  </button>
+                  <span 
+                    className="text-lg text-[#640D5F] font-medium cursor-pointer hover:text-[#FFB200]"
+                    onClick={() => {
+                      setEditingProductId(product.id);
+                      setEditingName(product.name);
+                    }}
+                  >
+                    {product.name}
+                  </span>
+                </div>
               )}
               
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">{product.category}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -355,7 +375,28 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#640D5F] to-[#D91656] p-4">
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-6">
-        <h1 className="text-2xl font-bold mb-6 text-[#640D5F] text-center">ניהול מערכת</h1>
+        <div className="relative flex items-center justify-between mb-6">
+          <div className="absolute left-0 flex items-center gap-4">
+            <button
+              onClick={() => router.push('/admin/new')}
+              className="p-2 rounded-lg transition-colors duration-200 text-[#640D5F] hover:text-[#FFB200]"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                strokeWidth={1.5} 
+                stroke="currentColor" 
+                className="w-6 h-6"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
+          </div>
+          <h1 className="text-2xl font-bold text-[#640D5F] text-center w-full">
+            {activeMainTab === 'products' ? 'ניהול מוצרים' : 'ניהול הזמנות'}
+          </h1>
+        </div>
         
         {/* Main Tabs */}
         <div className="flex space-x-2 mb-6 border-b border-[#FFB200] overflow-x-auto">
