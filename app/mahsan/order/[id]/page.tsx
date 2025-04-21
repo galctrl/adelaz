@@ -213,9 +213,31 @@ export default function MahsanOrderPage() {
                       isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
                     }`}
                   >
-                    <span className="text-lg text-[#640D5F] font-medium">
-                      {showThaiNames ? product.thai_product_name : product.name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg text-[#640D5F] font-medium">
+                        {showThaiNames ? product.thai_product_name : product.name}
+                      </span>
+                      <button
+                        onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(product.name)}&tbm=isch`, '_blank')}
+                        className="p-1 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200"
+                        title="חפש תמונות בגוגל"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                          className="w-5 h-5"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
                     <div className="flex items-center gap-3">
                       <span className="text-[#640D5F]">הוזמן: {orderItem.quantity}</span>
                       {(orderDetails?.status === 'open' || orderDetails?.status === 'in_progress') ? (
