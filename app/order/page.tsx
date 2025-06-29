@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Product } from '@/types';
 import { useRouter } from 'next/navigation';
@@ -48,10 +48,11 @@ const OrdersIcon = () => (
 
 export default function OrderPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [quantities, setQuantities] = useState<{[key: string]: number}>({});
+  const [quantities, setQuantities] = useState<{[key: string]: string}>({});
   const [selectedCategory, setSelectedCategory] = useState<string>('ירקות');
   const [categories, setCategories] = useState<string[]>([]);
   const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
+  const [debounceTimers, setDebounceTimers] = useState<{[key: string]: NodeJS.Timeout}>({});
   const router = useRouter();
 
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function OrderPage() {
         // Convert items to quantities object
         const savedQuantities = itemsData.reduce((acc, item) => ({
           ...acc,
-          [item.product_id]: item.quantity
+          [item.product_id]: item.quantity.toString()
         }), {});
 
         setQuantities(savedQuantities);
@@ -111,15 +112,39 @@ export default function OrderPage() {
   };
 
   const filteredProducts = products.filter(product => product.category === selectedCategory);
-  const selectedProducts = products.filter(product => quantities[product.id.toString()] > 0);
+  const selectedProducts = products.filter(product => {
+    const quantity = quantities[product.id.toString()];
+    return quantity && parseInt(quantity) > 0;
+  });
 
-  const handleQuantityChange = async (productId: number | string, quantity: number) => {
+  const debouncedQuantityChange = useCallback((productId: number | string, quantity: string) => {
+    const productIdStr = productId.toString();
+    
+    // Clear existing timer for this product
+    if (debounceTimers[productIdStr]) {
+      clearTimeout(debounceTimers[productIdStr]);
+    }
+    
+    // Set new timer
+    const timer = setTimeout(() => {
+      handleQuantityChange(productId, quantity);
+    }, 500); // 500ms delay
+    
+    setDebounceTimers(prev => ({
+      ...prev,
+      [productIdStr]: timer
+    }));
+  }, [debounceTimers]);
+
+  const handleQuantityChange = async (productId: number | string, quantity: string) => {
     const productIdStr = productId.toString();
     const storeId = localStorage.getItem('storeId');
     if (!storeId) {
       router.push('/');
       return;
     }
+
+    const numericQuantity = quantity === '' ? 0 : parseInt(quantity) || 0;
 
     try {
       if (currentOrderId) {
@@ -158,7 +183,7 @@ export default function OrderPage() {
             .insert({
               order_id: newOrderData.id,
               product_id: productIdStr,
-              quantity: quantity,
+              quantity: numericQuantity,
               fulfilled_quantity: 0
             });
 
@@ -199,7 +224,7 @@ export default function OrderPage() {
           .insert({
             order_id: orderData.id,
             product_id: productIdStr,
-            quantity: quantity,
+            quantity: numericQuantity,
             fulfilled_quantity: 0
           });
 
@@ -207,7 +232,7 @@ export default function OrderPage() {
 
       } else {
         // Update existing order
-        if (quantity === 0) {
+        if (numericQuantity === 0) {
           // Delete item if quantity is 0
           const { error: deleteError } = await supabase
             .from('order_items')
@@ -230,7 +255,7 @@ export default function OrderPage() {
             // Update existing item
             const { error: updateError } = await supabase
               .from('order_items')
-              .update({ quantity: quantity })
+              .update({ quantity: numericQuantity })
               .eq('order_id', currentOrderId)
               .eq('product_id', productIdStr);
 
@@ -242,7 +267,7 @@ export default function OrderPage() {
               .insert({
                 order_id: currentOrderId,
                 product_id: productIdStr,
-                quantity: quantity,
+                quantity: numericQuantity,
                 fulfilled_quantity: 0
               });
 
@@ -254,9 +279,40 @@ export default function OrderPage() {
       console.error('Error updating order:', error);
       setQuantities(prev => ({
         ...prev,
-        [productIdStr]: prev[productIdStr] || 0
+        [productIdStr]: prev[productIdStr] || ''
       }));
       alert('שגיאה בעדכון ההזמנה');
+    }
+  };
+
+  const handleIncrement = (productId: number | string) => {
+    const productIdStr = productId.toString();
+    const currentValue = quantities[productIdStr] || '';
+    const currentNumber = currentValue === '' ? 0 : parseInt(currentValue) || 0;
+    const newValue = (currentNumber + 1).toString();
+    handleQuantityChange(productId, newValue);
+  };
+
+  const handleDecrement = (productId: number | string) => {
+    const productIdStr = productId.toString();
+    const currentValue = quantities[productIdStr] || '';
+    const currentNumber = currentValue === '' ? 0 : parseInt(currentValue) || 0;
+    const newValue = Math.max(0, currentNumber - 1).toString();
+    handleQuantityChange(productId, newValue);
+  };
+
+  const handleInputChange = (productId: number | string, value: string) => {
+    const productIdStr = productId.toString();
+    
+    // Update local state immediately for responsive UI
+    setQuantities(prev => ({
+      ...prev,
+      [productIdStr]: value
+    }));
+    
+    // Debounce the actual API call
+    if (value === '' || /^\d*$/.test(value)) {
+      debouncedQuantityChange(productId, value);
     }
   };
 
@@ -288,13 +344,45 @@ export default function OrderPage() {
         {filteredProducts.map(product => (
           <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-[#FFB200]">
             <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
-            <input
-              type="number"
-              min="0"
-              value={quantities[product.id.toString()] || 0}
-              onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value) || 0)}
-              className="ml-4 rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F] focus:border-[#EB5B00] focus:ring-[#EB5B00] bg-white w-20"
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleDecrement(product.id)}
+                className="p-2 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200 border-2 border-[#FFB200] hover:border-[#EB5B00]"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12h-15" />
+                </svg>
+              </button>
+              <input
+                type="text"
+                value={quantities[product.id.toString()] || ''}
+                onChange={(e) => handleInputChange(product.id, e.target.value)}
+                className="w-16 text-center rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F] focus:border-[#EB5B00] focus:ring-[#EB5B00] bg-white"
+                placeholder="0"
+              />
+              <button
+                onClick={() => handleIncrement(product.id)}
+                className="p-2 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200 border-2 border-[#FFB200] hover:border-[#EB5B00]"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </button>
+            </div>
           </div>
         ))}
       </div>
