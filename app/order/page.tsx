@@ -51,8 +51,8 @@ export default function OrderPage() {
   const [quantities, setQuantities] = useState<{[key: string]: string}>({});
   const [selectedCategory, setSelectedCategory] = useState<string>('ירקות');
   const [categories, setCategories] = useState<string[]>([]);
-  const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [debounceTimers, setDebounceTimers] = useState<{[key: string]: NodeJS.Timeout}>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -63,39 +63,7 @@ export default function OrderPage() {
     }
     
     fetchProducts();
-    checkExistingOrder(parseInt(storeId));
   }, []);
-
-  const checkExistingOrder = async (storeId: number) => {
-    // Get the latest open order for this store
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('store_id', storeId)
-      .eq('status', 'open')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (orderData) {
-      // Found an open order, get its items
-      const { data: itemsData } = await supabase
-        .from('order_items')
-        .select('product_id, quantity, fulfilled_quantity')
-        .eq('order_id', orderData.id);
-
-      if (itemsData) {
-        // Convert items to quantities object
-        const savedQuantities = itemsData.reduce((acc, item) => ({
-          ...acc,
-          [item.product_id]: item.quantity.toString()
-        }), {});
-
-        setQuantities(savedQuantities);
-        setCurrentOrderId(orderData.id);
-      }
-    }
-  };
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -136,153 +104,12 @@ export default function OrderPage() {
     }));
   }, [debounceTimers]);
 
-  const handleQuantityChange = async (productId: number | string, quantity: string) => {
+  const handleQuantityChange = (productId: number | string, quantity: string) => {
     const productIdStr = productId.toString();
-    const storeId = localStorage.getItem('storeId');
-    if (!storeId) {
-      router.push('/');
-      return;
-    }
-
-    const numericQuantity = quantity === '' ? 0 : parseInt(quantity) || 0;
-
-    try {
-      if (currentOrderId) {
-        // Check current order status
-        const { data: orderData, error: orderError } = await supabase
-          .from('orders')
-          .select('status, store_id')  // Also select store_id to verify ownership
-          .eq('id', currentOrderId)
-          .single();
-
-        if (orderError) throw orderError;
-
-        // Verify order belongs to current store
-        if (orderData.store_id !== parseInt(storeId)) {
-          throw new Error('Order belongs to different store');
-        }
-
-        if (orderData.status !== 'open') {
-          // Create new order if current order is not open
-          const { data: newOrderData, error: newOrderError } = await supabase
-            .from('orders')
-            .insert({
-              store_id: parseInt(storeId),  // Use current store ID
-              status: 'open'
-            })
-            .select()
-            .single();
-
-          if (newOrderError) throw newOrderError;
-
-          setCurrentOrderId(newOrderData.id);
-
-          // Insert the new quantity
-          const { error: insertError } = await supabase
-            .from('order_items')
-            .insert({
-              order_id: newOrderData.id,
-              product_id: productIdStr,
-              quantity: numericQuantity,
-              fulfilled_quantity: 0
-            });
-
-          if (insertError) throw insertError;
-
-          // Update quantities state
-          setQuantities({ [productIdStr]: quantity });
-
-          // Alert user about new order creation
-          alert('נוצרה הזמנה חדשה');
-          return;
-        }
-      }
-
-      // Continue with normal flow for open orders or no current order
-      setQuantities(prev => ({
-        ...prev,
-        [productIdStr]: quantity
-      }));
-
-      if (!currentOrderId) {
-        // Create new order if none exists
-        const { data: orderData, error: orderError } = await supabase
-          .from('orders')
-          .insert({
-            store_id: parseInt(storeId),
-            status: 'open'
-          })
-          .select()
-          .single();
-
-        if (orderError) throw orderError;
-        setCurrentOrderId(orderData.id);
-
-        // Insert first item
-        const { error: itemError } = await supabase
-          .from('order_items')
-          .insert({
-            order_id: orderData.id,
-            product_id: productIdStr,
-            quantity: numericQuantity,
-            fulfilled_quantity: 0
-          });
-
-        if (itemError) throw itemError;
-
-      } else {
-        // Update existing order
-        if (numericQuantity === 0) {
-          // Delete item if quantity is 0
-          const { error: deleteError } = await supabase
-            .from('order_items')
-            .delete()
-            .eq('order_id', currentOrderId)
-            .eq('product_id', productIdStr);
-
-          if (deleteError) throw deleteError;
-        } else {
-          // Check if item exists
-          const { data: existingItems, error: checkError } = await supabase
-            .from('order_items')
-            .select()
-            .eq('order_id', currentOrderId)
-            .eq('product_id', productIdStr);
-
-          if (checkError) throw checkError;
-
-          if (existingItems && existingItems.length > 0) {
-            // Update existing item
-            const { error: updateError } = await supabase
-              .from('order_items')
-              .update({ quantity: numericQuantity })
-              .eq('order_id', currentOrderId)
-              .eq('product_id', productIdStr);
-
-            if (updateError) throw updateError;
-          } else {
-            // Insert new item
-            const { error: insertError } = await supabase
-              .from('order_items')
-              .insert({
-                order_id: currentOrderId,
-                product_id: productIdStr,
-                quantity: numericQuantity,
-                fulfilled_quantity: 0
-              });
-
-            if (insertError) throw insertError;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error updating order:', error);
-      setQuantities(prev => ({
-        ...prev,
-        [productIdStr]: prev[productIdStr] || ''
-      }));
-      alert('שגיאה בעדכון ההזמנה');
-    }
+    setQuantities(prev => ({
+      ...prev,
+      [productIdStr]: quantity
+    }));
   };
 
   const handleIncrement = (productId: number | string) => {
@@ -316,6 +143,64 @@ export default function OrderPage() {
     }
   };
 
+  const handleFinishOrder = async () => {
+    const storeId = localStorage.getItem('storeId');
+    if (!storeId) {
+      router.push('/');
+      return;
+    }
+
+    // Check if there are any items in the cart
+    const hasItems = selectedProducts.length > 0;
+    if (!hasItems) {
+      alert('אין מוצרים בהזמנה');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Create new order
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          store_id: parseInt(storeId),
+          status: 'open'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Insert all order items
+      const orderItems = selectedProducts.map(product => ({
+        order_id: orderData.id,
+        product_id: product.id.toString(),
+        quantity: parseInt(quantities[product.id.toString()]),
+        fulfilled_quantity: 0
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      alert('ההזמנה נשלחה בהצלחה');
+      
+      // Clear the cart
+      setQuantities({});
+      
+      // Navigate to orders page
+      router.push('/orders');
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert('שגיאה בשליחת ההזמנה');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const renderContent = () => {
     if (selectedCategory === 'הזמנה') {
       return (
@@ -323,17 +208,27 @@ export default function OrderPage() {
           {selectedProducts.length === 0 ? (
             <p className="text-center text-gray-500">לא נבחרו מוצרים</p>
           ) : (
-            selectedProducts.map(product => (
-              <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-[#FFB200]">
-                <div className="flex flex-col">
-                  <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
-                  <span className="text-sm text-gray-500">{product.category}</span>
+            <>
+              {selectedProducts.map(product => (
+                <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-[#FFB200]">
+                  <div className="flex flex-col">
+                    <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
+                    <span className="text-sm text-gray-500">{product.category}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[#640D5F]">כמות: {quantities[product.id.toString()]}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[#640D5F]">כמות: {quantities[product.id.toString()]}</span>
-                </div>
-              </div>
-            ))
+              ))}
+              
+              <button
+                onClick={handleFinishOrder}
+                disabled={isSubmitting}
+                className="w-full py-3 px-4 rounded-lg font-bold text-white bg-[#EB5B00] hover:bg-[#FFB200] transition-colors duration-200 disabled:opacity-50"
+              >
+                {isSubmitting ? 'שולח הזמנה...' : 'סיים הזמנה'}
+              </button>
+            </>
           )}
         </div>
       );
@@ -412,7 +307,7 @@ export default function OrderPage() {
             </button>
           </div>
           <h1 className="text-2xl font-bold text-[#640D5F] text-center w-full">
-            {currentOrderId ? 'עריכת הזמנה' : 'הזמנה חדשה'}
+            הזמנה חדשה
           </h1>
         </div>
         

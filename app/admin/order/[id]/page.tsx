@@ -56,6 +56,7 @@ export default function AdminOrderPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('ירקות');
   const [categories, setCategories] = useState<string[]>([]);
   const [fulfilledQuantities, setFulfilledQuantities] = useState<{[key: string | number]: number}>({});
+  const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const router = useRouter();
   const params = useParams();
   const orderId = params?.id as string;
@@ -162,15 +163,55 @@ export default function AdminOrderPage() {
   };
 
   const getProductsForCategory = (category: string) => {
-    if (category === 'הזמנה') {
-      return products.filter(product => 
-        orderDetails?.items.some(item => item.product_id === product.id)
-      );
-    }
-    return products.filter(product => 
-      product.category === category && 
+    let filteredProducts = products.filter(product => 
       orderDetails?.items.some(item => item.product_id === product.id)
     );
+
+    // If showing only incomplete items, filter out fully fulfilled ones
+    if (showOnlyIncomplete && orderDetails) {
+      filteredProducts = filteredProducts.filter(product => {
+        const orderItem = orderDetails.items.find(item => item.product_id === product.id);
+        if (!orderItem) return false;
+        
+        const productId = product.id.toString();
+        let fulfilledQty = 0;
+        
+        // For open orders, use the current state
+        if (orderDetails.status === 'open') {
+          fulfilledQty = fulfilledQuantities[productId] || 0;
+        } else {
+          // For closed orders, use the database value
+          fulfilledQty = orderItem.fulfilled_quantity || 0;
+        }
+        
+        return fulfilledQty < orderItem.quantity;
+      });
+    }
+
+    if (category === 'הזמנה') {
+      return filteredProducts;
+    }
+    
+    return filteredProducts.filter(product => product.category === category);
+  };
+
+  const getIncompleteItemsCount = () => {
+    if (!orderDetails) return 0;
+    
+    return orderDetails.items.filter(item => {
+      const productId = item.product_id.toString();
+      let fulfilledQty = 0;
+      
+      // For open orders, use the current state
+      if (orderDetails.status === 'open') {
+        fulfilledQty = fulfilledQuantities[productId] || 0;
+      } else {
+        // For closed orders, use the database value
+        fulfilledQty = item.fulfilled_quantity || 0;
+      }
+      
+      return fulfilledQty < item.quantity;
+    }).length;
   };
 
   const renderContent = () => {
@@ -179,12 +220,84 @@ export default function AdminOrderPage() {
     if (selectedCategory === 'הזמנה') {
       return (
         <div className="space-y-4">
-          {categoryProducts.map(product => {
+          {categoryProducts.length === 0 ? (
+            <p className="text-center text-gray-500">
+              {showOnlyIncomplete ? 'אין מוצרים שטרם סופקו במלואם' : 'אין מוצרים'}
+            </p>
+          ) : (
+            <>
+              {categoryProducts.map(product => {
+                const orderItem = orderDetails?.items.find(item => item.product_id === product.id);
+                if (!orderItem) return null;
+
+                const productId = product.id.toString();
+                let fulfilledQty = 0;
+                
+                // For open orders, use the current state
+                if (orderDetails?.status === 'open') {
+                  fulfilledQty = fulfilledQuantities[productId] || 0;
+                } else {
+                  // For closed orders, use the database value
+                  fulfilledQty = orderItem.fulfilled_quantity || 0;
+                }
+                
+                const isFullyFulfilled = orderItem.quantity === fulfilledQty;
+
+                return (
+                  <div 
+                    key={productId} 
+                    className={`flex items-center justify-between p-4 rounded-lg border-2 border-[#FFB200] ${
+                      isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
+                      <span className="text-sm text-gray-500">{product.category}</span>
+                    </div>
+                    <div className="flex items-center space-x-4 gap-2 text-[#640D5F]">
+                      <span>הוזמן: {orderItem.quantity}</span>
+                      <span>סופק: {fulfilledQty}</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {orderDetails?.status === 'open' && (
+                <button
+                  onClick={handleCloseOrder}
+                  className="mt-6 w-full py-3 px-4 rounded-lg font-bold text-white bg-[#EB5B00] hover:bg-[#FFB200] transition-colors duration-200"
+                >
+                  סגור הזמנה
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {categoryProducts.length === 0 ? (
+          <p className="text-center text-gray-500">
+            {showOnlyIncomplete ? 'אין מוצרים שטרם סופקו במלואם' : 'אין מוצרים'}
+          </p>
+        ) : (
+          categoryProducts.map(product => {
             const orderItem = orderDetails?.items.find(item => item.product_id === product.id);
             if (!orderItem) return null;
 
             const productId = product.id.toString();
-            const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[productId];
+            let fulfilledQty = 0;
+            
+            // For open orders, use the current state
+            if (orderDetails?.status === 'open') {
+              fulfilledQty = fulfilledQuantities[productId] || 0;
+            } else {
+              // For closed orders, use the database value
+              fulfilledQty = orderItem.fulfilled_quantity || 0;
+            }
+            
+            const isFullyFulfilled = orderItem.quantity === fulfilledQty;
 
             return (
               <div 
@@ -193,68 +306,30 @@ export default function AdminOrderPage() {
                   isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
                 }`}
               >
-                <div className="flex flex-col">
-                  <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
-                  <span className="text-sm text-gray-500">{product.category}</span>
-                </div>
-                <div className="flex items-center space-x-4 gap-2 text-[#640D5F]">
-                  <span>הוזמן: {orderItem.quantity}</span>
-                  <span>סופק: {fulfilledQuantities[productId] || 0}</span>
+                <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[#640D5F]">הוזמן: {orderItem.quantity}</span>
+                  {orderDetails?.status === 'open' ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#640D5F]">סופק: </span>
+                      <select
+                        value={fulfilledQuantities[productId] || 0}
+                        onChange={(e) => handleFulfilledChange(productId, parseInt(e.target.value))}
+                        className="rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F]"
+                      >
+                        {[...Array(orderItem.quantity + 1)].map((_, i) => (
+                          <option key={i} value={i}>{i}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <span className="text-[#640D5F]">סופק: {fulfilledQty}</span>
+                  )}
                 </div>
               </div>
             );
-          })}
-          {orderDetails?.status === 'open' && (
-            <button
-              onClick={handleCloseOrder}
-              className="mt-6 w-full py-3 px-4 rounded-lg font-bold text-white bg-[#EB5B00] hover:bg-[#FFB200] transition-colors duration-200"
-            >
-              סגור הזמנה
-            </button>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        {categoryProducts.map(product => {
-          const orderItem = orderDetails?.items.find(item => item.product_id === product.id);
-          if (!orderItem) return null;
-
-          const productId = product.id.toString();
-          const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[productId];
-
-          return (
-            <div 
-              key={productId} 
-              className={`flex items-center justify-between p-4 rounded-lg border-2 border-[#FFB200] ${
-                isFullyFulfilled ? 'bg-green-50' : 'bg-gray-50'
-              }`}
-            >
-              <span className="text-lg text-[#640D5F] font-medium">{product.name}</span>
-              <div className="flex items-center gap-3">
-                <span className="text-[#640D5F]">הוזמן: {orderItem.quantity}</span>
-                {orderDetails?.status === 'open' ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[#640D5F]">סופק: </span>
-                    <select
-                      value={fulfilledQuantities[productId] || 0}
-                      onChange={(e) => handleFulfilledChange(productId, parseInt(e.target.value))}
-                      className="rounded-lg border-2 border-[#FFB200] p-2 text-[#640D5F]"
-                    >
-                      {[...Array(orderItem.quantity + 1)].map((_, i) => (
-                        <option key={i} value={i}>{i}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <span className="text-[#640D5F]">סופק: {orderItem.fulfilled_quantity || 0}</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+          })
+        )}
       </div>
     );
   };
@@ -265,16 +340,49 @@ export default function AdminOrderPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#640D5F] to-[#D91656] p-4">
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-6">
         <div className="relative flex items-center justify-between mb-6">
-          <button
-            onClick={() => setSelectedCategory('הזמנה')}
-            className={`absolute left-0 p-2 rounded-lg transition-colors duration-200 ${
-              selectedCategory === 'הזמנה'
-                ? 'text-[#FFB200]'
-                : 'text-[#640D5F] hover:text-[#FFB200]'
-            }`}
-          >
-            <CartIcon itemCount={orderDetails?.items.length || 0} />
-          </button>
+          <div className="absolute left-0 flex items-center gap-2">
+            <button
+              onClick={() => setSelectedCategory('הזמנה')}
+              className={`p-2 rounded-lg transition-colors duration-200 ${
+                selectedCategory === 'הזמנה'
+                  ? 'text-[#FFB200]'
+                  : 'text-[#640D5F] hover:text-[#FFB200]'
+              }`}
+            >
+              <CartIcon itemCount={orderDetails?.items.length || 0} />
+            </button>
+            <button
+              onClick={() => setShowOnlyIncomplete(!showOnlyIncomplete)}
+              className={`p-2 rounded-lg transition-colors duration-200 ${
+                showOnlyIncomplete
+                  ? 'text-[#FFB200]'
+                  : 'text-[#640D5F] hover:text-[#FFB200]'
+              }`}
+              title="הצג רק מוצרים שטרם סופקו במלואם"
+            >
+              <div className="relative">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"
+                  />
+                </svg>
+                {getIncompleteItemsCount() > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-[#EB5B00] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                    {getIncompleteItemsCount()}
+                  </span>
+                )}
+              </div>
+            </button>
+          </div>
           <h1 className="text-2xl font-bold text-[#640D5F] text-center w-full">
             הזמנה #{orderDetails?.id} - {orderDetails?.store?.name}
           </h1>
