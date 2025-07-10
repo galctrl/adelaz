@@ -15,8 +15,15 @@ interface Order {
   };
 }
 
+interface AccumulatedItem {
+  product_id: number;
+  product_name: string;
+  total_quantity: number;
+  order_count: number;
+}
+
 type MainTab = 'products' | 'orders';
-type OrderTab = 'open' | 'in_progress' | 'closed';
+type OrderTab = 'open' | 'in_progress' | 'closed' | 'accumulated';
 
 export default function AdminPage() {
   const [activeMainTab, setActiveMainTab] = useState<MainTab>('products');
@@ -25,6 +32,7 @@ export default function AdminPage() {
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
   const [inProgressOrders, setInProgressOrders] = useState<Order[]>([]);
   const [closedOrders, setClosedOrders] = useState<Order[]>([]);
+  const [accumulatedItems, setAccumulatedItems] = useState<AccumulatedItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [editingProductId, setEditingProductId] = useState<string | number | null>(null);
@@ -41,6 +49,12 @@ export default function AdminPage() {
     fetchProducts();
     fetchOrders();
   }, []);
+
+  useEffect(() => {
+    if (activeOrderTab === 'accumulated') {
+      fetchAccumulatedItems();
+    }
+  }, [activeOrderTab]);
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -120,6 +134,57 @@ export default function AdminPage() {
         store: { name: (order.store as any).name }
       }));
       setClosedOrders(transformedClosedOrders);
+    }
+  };
+
+  const fetchAccumulatedItems = async () => {
+    // Get all open orders
+    const { data: openOrdersData } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('status', 'open');
+
+    if (!openOrdersData || openOrdersData.length === 0) {
+      setAccumulatedItems([]);
+      return;
+    }
+
+    const orderIds = openOrdersData.map(order => order.id);
+
+    // Get all items from open orders
+    const { data: itemsData } = await supabase
+      .from('order_items')
+      .select(`
+        product_id,
+        quantity,
+        products!inner(name)
+      `)
+      .in('order_id', orderIds);
+
+    if (itemsData) {
+      // Accumulate quantities by product
+      const accumulated = itemsData.reduce((acc, item) => {
+        const productId = item.product_id;
+        const productName = (item.products as any).name;
+        
+        if (!acc[productId]) {
+          acc[productId] = {
+            product_id: productId,
+            product_name: productName,
+            total_quantity: 0,
+            order_count: 0
+          };
+        }
+        
+        acc[productId].total_quantity += item.quantity;
+        acc[productId].order_count += 1;
+        
+        return acc;
+      }, {} as { [key: number]: AccumulatedItem });
+
+      // Convert to array and sort by total quantity
+      const accumulatedArray = Object.values(accumulated).sort((a, b) => b.total_quantity - a.total_quantity);
+      setAccumulatedItems(accumulatedArray);
     }
   };
 
@@ -252,15 +317,15 @@ export default function AdminPage() {
                       />
                     </svg>
                   </button>
-                  <span 
-                    className="text-lg text-[#640D5F] font-medium cursor-pointer hover:text-[#FFB200]"
-                    onClick={() => {
-                      setEditingProductId(product.id);
-                      setEditingName(product.name);
-                    }}
-                  >
-                    {product.name}
-                  </span>
+                <span 
+                  className="text-lg text-[#640D5F] font-medium cursor-pointer hover:text-[#FFB200]"
+                  onClick={() => {
+                    setEditingProductId(product.id);
+                    setEditingName(product.name);
+                  }}
+                >
+                  {product.name}
+                </span>
                 </div>
               )}
               
@@ -310,6 +375,29 @@ export default function AdminPage() {
     ));
   };
 
+  const renderAccumulatedItemsList = () => {
+    if (accumulatedItems.length === 0) {
+      return <p className="text-center text-gray-500">אין פריטים מצטברים</p>;
+    }
+
+    return (
+      <div className="space-y-4">
+        {accumulatedItems.map(item => (
+          <div
+            key={item.product_id}
+            className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-[#FFB200]"
+          >
+            <div className="flex flex-col">
+              <span className="text-lg text-[#640D5F] font-medium">{item.product_name}</span>
+              <span className="text-sm text-gray-500">כמות מצטברת: {item.total_quantity}</span>
+              <span className="text-sm text-gray-500">מספר הזמנות: {item.order_count}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const renderOrdersContent = () => {
     return (
       <div>
@@ -345,17 +433,29 @@ export default function AdminPage() {
           >
             הזמנות סגורות
           </button>
+          <button
+            onClick={() => setActiveOrderTab('accumulated')}
+            className={`px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 whitespace-nowrap ${
+              activeOrderTab === 'accumulated'
+                ? 'bg-[#FFB200] text-white'
+                : 'text-[#640D5F] hover:bg-[#FFB200]/20'
+            }`}
+          >
+            הזמנות מצטבר
+          </button>
         </div>
 
         {/* Orders List */}
         <div className="space-y-4">
-          {renderOrdersList(
-            activeOrderTab === 'open' 
-              ? openOrders 
-              : activeOrderTab === 'in_progress'
-                ? inProgressOrders
-                : closedOrders
-          )}
+          {activeOrderTab === 'open' 
+            ? renderOrdersList(openOrders)
+            : activeOrderTab === 'in_progress'
+              ? renderOrdersList(inProgressOrders)
+              : activeOrderTab === 'closed'
+                ? renderOrdersList(closedOrders)
+                : activeOrderTab === 'accumulated'
+                  ? renderAccumulatedItemsList()
+                  : null}
         </div>
       </div>
     );

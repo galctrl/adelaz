@@ -16,10 +16,11 @@ interface Order {
   store: StoreResponse;
 }
 
-type OrderTab = 'in_progress' | 'closed';
+type OrderTab = 'open' | 'in_progress' | 'closed';
 
 export default function OrdersPage() {
-  const [activeOrderTab, setActiveOrderTab] = useState<OrderTab>('in_progress');
+  const [activeOrderTab, setActiveOrderTab] = useState<OrderTab>('open');
+  const [openOrders, setOpenOrders] = useState<Order[]>([]);
   const [inProgressOrders, setInProgressOrders] = useState<Order[]>([]);
   const [closedOrders, setClosedOrders] = useState<Order[]>([]);
   const router = useRouter();
@@ -35,6 +36,28 @@ export default function OrdersPage() {
   }, []);
 
   const fetchOrders = async (storeId: number) => {
+    // Fetch open orders
+    const { data: openData } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        store_id,
+        status,
+        updated_at,
+        store:stores!inner(name)
+      `)
+      .eq('store_id', storeId)
+      .eq('status', 'open')
+      .order('updated_at', { ascending: false });
+
+    if (openData) {
+      const transformedOpenOrders = openData.map(order => ({
+        ...order,
+        store: { name: (order.store as any).name }
+      }));
+      setOpenOrders(transformedOpenOrders);
+    }
+
     // Fetch in_progress orders
     const { data: progressData } = await supabase
       .from('orders')
@@ -92,7 +115,12 @@ export default function OrdersPage() {
 
   const renderOrdersList = (orders: Order[]) => {
     if (orders.length === 0) {
-      return <p className="text-center text-gray-500">אין הזמנות</p>;
+      const statusText = {
+        open: 'פתוחות',
+        in_progress: 'בהכנה',
+        closed: 'סגורות'
+      }[activeOrderTab];
+      return <p className="text-center text-gray-500">אין הזמנות {statusText}</p>;
     }
 
     return orders.map(order => (
@@ -136,10 +164,20 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold text-[#640D5F] text-center w-full">ניהול הזמנות</h1>
         </div>
         
-        <div className="flex space-x-2 mb-6 border-b border-[#FFB200]">
+        <div className="flex space-x-2 mb-6 border-b border-[#FFB200] overflow-x-auto touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <button
+            onClick={() => setActiveOrderTab('open')}
+            className={`flex-shrink-0 px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 whitespace-nowrap ${
+              activeOrderTab === 'open'
+                ? 'bg-[#FFB200] text-white'
+                : 'text-[#640D5F] hover:bg-[#FFB200]/20'
+            }`}
+          >
+            הזמנות פתוחות
+          </button>
           <button
             onClick={() => setActiveOrderTab('in_progress')}
-            className={`px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 ${
+            className={`flex-shrink-0 px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 whitespace-nowrap ${
               activeOrderTab === 'in_progress'
                 ? 'bg-[#FFB200] text-white'
                 : 'text-[#640D5F] hover:bg-[#FFB200]/20'
@@ -149,7 +187,7 @@ export default function OrdersPage() {
           </button>
           <button
             onClick={() => setActiveOrderTab('closed')}
-            className={`px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 ${
+            className={`flex-shrink-0 px-4 py-2 rounded-t-lg font-medium transition-colors duration-200 whitespace-nowrap ${
               activeOrderTab === 'closed'
                 ? 'bg-[#FFB200] text-white'
                 : 'text-[#640D5F] hover:bg-[#FFB200]/20'
@@ -161,9 +199,11 @@ export default function OrdersPage() {
 
         <div className="space-y-4">
           {renderOrdersList(
-            activeOrderTab === 'in_progress' 
-              ? inProgressOrders 
-              : closedOrders
+            activeOrderTab === 'open' 
+              ? openOrders 
+              : activeOrderTab === 'in_progress'
+                ? inProgressOrders
+                : closedOrders
           )}
         </div>
       </div>
