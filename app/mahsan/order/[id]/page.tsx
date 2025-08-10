@@ -60,6 +60,7 @@ export default function MahsanOrderPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [fulfilledQuantities, setFulfilledQuantities] = useState<{[key: string]: number}>({});
   const [showThaiNames, setShowThaiNames] = useState(false);
+  const [showOnlyIncomplete, setShowOnlyIncomplete] = useState(false);
   const router = useRouter();
   const params = useParams();
   const orderId = params?.id as string;
@@ -167,15 +168,55 @@ export default function MahsanOrderPage() {
   };
 
   const getProductsForCategory = (category: string) => {
-    if (category === 'הזמנה') {
-      return products.filter(product => 
-        orderDetails?.items.some(item => item.product_id === product.id)
-      );
-    }
-    return products.filter(product => 
-      product.category === category && 
+    let filteredProducts = products.filter(product => 
       orderDetails?.items.some(item => item.product_id === product.id)
     );
+
+    // If showing only incomplete items, filter out fully fulfilled ones
+    if (showOnlyIncomplete && orderDetails) {
+      filteredProducts = filteredProducts.filter(product => {
+        const orderItem = orderDetails.items.find(item => item.product_id === product.id);
+        if (!orderItem) return false;
+        
+        const productId = product.id.toString();
+        let fulfilledQty = 0;
+        
+        // For open orders, use the current state
+        if (orderDetails.status === 'open') {
+          fulfilledQty = fulfilledQuantities[productId] || 0;
+        } else {
+          // For closed orders, use the database value
+          fulfilledQty = orderItem.fulfilled_quantity || 0;
+        }
+        
+        return fulfilledQty < orderItem.quantity;
+      });
+    }
+
+    if (category === 'הזמנה') {
+      return filteredProducts;
+    }
+    
+    return filteredProducts.filter(product => product.category === category);
+  };
+
+  const getIncompleteItemsCount = () => {
+    if (!orderDetails) return 0;
+    
+    return orderDetails.items.filter(item => {
+      const productId = item.product_id.toString();
+      let fulfilledQty = 0;
+      
+      // For open orders, use the current state
+      if (orderDetails.status === 'open') {
+        fulfilledQty = fulfilledQuantities[productId] || 0;
+      } else {
+        // For closed orders, use the database value
+        fulfilledQty = item.fulfilled_quantity || 0;
+      }
+      
+      return fulfilledQty < item.quantity;
+    }).length;
   };
 
   const renderContent = () => {
@@ -189,6 +230,42 @@ export default function MahsanOrderPage() {
       }
       return acc;
     }, {} as { [key: string]: Product[] });
+
+    // Apply filter if needed
+    if (showOnlyIncomplete && orderDetails) {
+      Object.keys(groupedProducts).forEach(category => {
+        groupedProducts[category] = groupedProducts[category].filter(product => {
+          const orderItem = orderDetails.items.find(item => item.product_id === product.id);
+          if (!orderItem) return false;
+          
+          const productId = product.id.toString();
+          let fulfilledQty = 0;
+          
+          if (orderDetails.status === 'open') {
+            fulfilledQty = fulfilledQuantities[productId] || 0;
+          } else {
+            fulfilledQty = orderItem.fulfilled_quantity || 0;
+          }
+          
+          return fulfilledQty < orderItem.quantity;
+        });
+      });
+    }
+
+    // Remove empty categories
+    Object.keys(groupedProducts).forEach(category => {
+      if (groupedProducts[category].length === 0) {
+        delete groupedProducts[category];
+      }
+    });
+
+    if (Object.keys(groupedProducts).length === 0) {
+      return (
+        <div className="text-center text-gray-500">
+          {showOnlyIncomplete ? 'אין מוצרים שטרם סופקו במלואם' : 'אין מוצרים'}
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-8">
@@ -204,7 +281,17 @@ export default function MahsanOrderPage() {
                 if (!orderItem) return null;
 
                 const productId = product.id.toString();
-                const isFullyFulfilled = orderItem.quantity === fulfilledQuantities[productId];
+                let fulfilledQty = 0;
+                
+                // For open orders, use the current state
+                if (orderDetails?.status === 'open') {
+                  fulfilledQty = fulfilledQuantities[productId] || 0;
+                } else {
+                  // For closed orders, use the database value
+                  fulfilledQty = orderItem.fulfilled_quantity || 0;
+                }
+                
+                const isFullyFulfilled = orderItem.quantity === fulfilledQty;
 
                 return (
                   <div 
@@ -254,7 +341,7 @@ export default function MahsanOrderPage() {
                           </select>
                         </div>
                       ) : (
-                        <span className="text-[#640D5F]">סופק: {orderItem.fulfilled_quantity || 0}</span>
+                        <span className="text-[#640D5F]">סופק: {fulfilledQty}</span>
                       )}
                     </div>
                   </div>
@@ -300,21 +387,54 @@ export default function MahsanOrderPage() {
           <h1 className="text-2xl font-bold text-[#640D5F] text-center w-full">
             הזמנה #{orderDetails?.id} - {orderDetails?.store?.name}
           </h1>
-          <button
-            onClick={() => setShowThaiNames(!showThaiNames)}
-            className="p-2 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200"
-          >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              strokeWidth={1.5} 
-              stroke="currentColor" 
-              className="w-6 h-6"
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowOnlyIncomplete(!showOnlyIncomplete)}
+              className={`p-2 rounded-lg transition-colors duration-200 ${
+                showOnlyIncomplete
+                  ? 'text-[#FFB200]'
+                  : 'text-[#640D5F] hover:text-[#FFB200]'
+              }`}
+              title="הצג רק מוצרים שטרם סופקו במלואם"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 7.5a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" />
-            </svg>
-          </button>
+              <div className="relative">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-6 h-6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"
+                  />
+                </svg>
+                {getIncompleteItemsCount() > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-[#EB5B00] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                    {getIncompleteItemsCount()}
+                  </span>
+                )}
+              </div>
+            </button>
+            <button
+              onClick={() => setShowThaiNames(!showThaiNames)}
+              className="p-2 rounded-lg text-[#640D5F] hover:text-[#FFB200] transition-colors duration-200"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                strokeWidth={1.5} 
+                stroke="currentColor" 
+                className="w-6 h-6"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 7.5a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" />
+              </svg>
+            </button>
+          </div>
         </div>
         
         {renderContent()}
